@@ -4,13 +4,6 @@ import datetime
 import pickle
 import os
 
-def getNewMark():
-    points = input('Zdobyte punkty: ')
-    pool = input('Pula powiększona o: ')
-    category = input('Kategoria oceny: ')
-    comment = input('Komentarz: (jedna linia) ')
-    return (points, pool, category, comment)
-
 
 class Mark:
     def __init__(self, points, pool, category, comment):
@@ -18,6 +11,14 @@ class Mark:
         self.pool = pool
         self.category = category
         self.comment = comment
+
+
+def getNewMark():
+    points = input('Zdobyte punkty: ')
+    pool = input('Pula powiększona o: ')
+    category = input('Kategoria oceny: ')
+    comment = input('Komentarz: (jedna linia) ')
+    return Mark(points, pool, category, comment)
 
 
 class Report:
@@ -36,7 +37,7 @@ class Report:
         self.comment = comment
         self.marks = marks
 
-reports = []
+migration1 = False
 
 
 def tryMigration1():
@@ -45,27 +46,45 @@ def tryMigration1():
     try:
         with open('/home/evil/raporty', 'rb') as inputFile:
             store = pickle.load(inputFile)
+        global migration1
+        migration1 = True
+        print('Wykonano migrację 1')
+        for (reportCreationTime, date, slot, present, teacherPresent,
+                revoked, additional, teacher, group, comment, marks) in store:
+                    newMarks = []
+                    for (points, pool, category, comment) in marks:
+                        newMarks.append(Mark(points, pool, category, comment))
+                    result.append(Report(
+                                        reportCreationTime, date, slot,
+                                        present, teacherPresent, revoked,
+                                        additional, teacher, group, comment,
+                                        newMarks))
     except IOError:
         pass
-    for (reportCreationTime, date, slot, present, teacherPresent,
-            revoked, additional, teacher, group, comment, marks) in store:
-                newMarks = []
-                for (points, pool, category, comment) in marks:
-                    newMarks.append(Mark(points, pool, category, comment))
-                result.append(Report(
-                                     reportCreationTime, date, slot, present,
-                                     teacherPresent, revoked, additional,
-                                     teacher, group, comment, newMarks))
     return result
 
 
-def main():
-    store = []
+def storeData(data):
+    with open('/home/evil/Studia/raporty', 'wb') as outputFile:
+        pickle.dump(data, outputFile, protocol=3)
+    global migration1
+    if migration1:
+        os.remove('/home/evil/raporty')
+
+
+def loadData(data):
     try:
-        with open('/home/evil/raporty', 'rb') as inputFile:
-            store = pickle.load(inputFile)
+        with open('/home/evil/Studia/raporty', 'rb') as inputFile:
+            newData = pickle.load(inputFile)
+            data.extend(newData)
     except IOError:
-        print(' Baza jest tworzona')
+        pass
+    return data
+
+
+def main():
+    store = tryMigration1()
+    store = loadData(store)
     while True:
         x = input('Dodać kolejny raport? [t/N] ')
         if len(x) < 1 or x[0].lower() != 't':
@@ -112,34 +131,36 @@ def main():
         print('Grupa:            ', group)
         print('Komentarz:        ', comment)
         print('Oceny:')
-        for (points, pool, category, comment) in marks:
-            print(points, '/', pool, ' - ', category, sep='')
-            print('Komentarz:', comment)
+        for mark in marks:
+            print(mark.points, '/', mark.pool, ' - ', mark.category, sep='')
+            print('Komentarz:', mark.comment)
         x = input('Dodać do bazy? [T/n]: ')
         if len(x) >= 1 and x[0].lower() != 't':
             continue
-        store.append((reportCreationTime, date, slot, present, teacherPresent, revoked, additional, teacher, group, comment, marks))
+        store.append(Report(reportCreationTime, date, slot, present,
+                             teacherPresent, revoked, additional, teacher,
+                             group, comment, marks))
 
     x = input('Czy chcesz wyświetlić zawartość bazy? [t/N] ')
     if len(x) >= 1 and x[0].lower() == 't':
-        for (reportCreationTime, date, slot, present, teacherPresent, revoked, additional, teacher, group, comment, marks) in store:
+        for report in store:
             print()
-            print('Raport stworzono: ', reportCreationTime)
-            print('Data:             ', date)
-            print('Godzina:          ', slot)
-            print('Obecny :          ', present)
-            print('Nauczyciel obecny:', teacherPresent)
-            print('Odwołane:         ', revoked)
-            print('Dodatkowe:        ', additional)
-            print('Nauczyciel:       ', teacher)
-            print('Grupa:            ', group)
-            print('Komentarz:        ', comment)
+            print('Raport stworzono: ', report.reportCreationTime)
+            print('Data:             ', report.date)
+            print('Godzina:          ', report.slot)
+            print('Obecny :          ', report.present)
+            print('Nauczyciel obecny:', report.teacherPresent)
+            print('Odwołane:         ', report.revoked)
+            print('Dodatkowe:        ', report.additional)
+            print('Nauczyciel:       ', report.teacher)
+            print('Grupa:            ', report.group)
+            print('Komentarz:        ', report.comment)
             print('Oceny:')
-            for (points, pool, category, comment) in marks:
-                print(points, '/', pool, ' - ', category, sep='')
-                print('Komentarz:', comment)
-    with open('/home/evil/raporty', 'wb') as outputFile:
-        pickle.dump(store, outputFile, protocol=3)
+            for mark in report.marks:
+                print(mark.points, '/', mark.pool, ' - ',
+                          mark.category, sep='')
+                print('Komentarz:', mark.comment)
+    storeData(store)
 
 if __name__ == "__main__":
     main()
