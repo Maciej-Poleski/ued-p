@@ -79,6 +79,9 @@ def loadData(data):
             data.extend(newData)
     except IOError:
         pass
+    except EOFError:
+        print('EOF <- plik wygląda na przycięty')
+        raise
     return data
 
 
